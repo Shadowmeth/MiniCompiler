@@ -1,0 +1,8 @@
+int age = 10;
+if (age > 18)
+{
+    print("you are eligible to vote at " + age + " years");
+} else 
+{
+    print("you can't vote currently sorry!");
+}
