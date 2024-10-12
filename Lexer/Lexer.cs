@@ -5,12 +5,14 @@ namespace MiniCompiler
         KEYWORD,
         STRING_LIT,
         IDENTIFIER,
+        NUMBER,
 
         LEFT_PAREN,
         RIGHT_PAREN,
         LEFT_BRACE,
         RIGHT_BRACE,
 
+        EQUAL,
         EQUAL_EQUAL,
         LESS_EQUAL,
         GREATER_EQUAL,
@@ -47,6 +49,12 @@ namespace MiniCompiler
             this.line = line;
             this.tokenType = tokenType;
         }
+
+        public override string ToString()
+        {
+            return $"at line: {line}, span: {startPosition}:{endPosition}, token text: \"{text}\"";
+        }
+
     }
 
     // NOTE: A lot of indexes start at 0. Need to save them as +1
@@ -55,7 +63,7 @@ namespace MiniCompiler
     {
         private HashSet<string>? m_keyWords = null;
         private bool m_writeToFile;
-        private String m_fileName = "";
+        private String m_fileName = ""; // this is without extension
         private String m_source = "";
         private int m_srcPtr = -1;
         private List<Token>? m_tokens = null;
@@ -130,6 +138,25 @@ namespace MiniCompiler
             Console.ForegroundColor = originalColor;
         }
 
+        public void debugPrintTokens()
+        {
+            ConsoleColor originalColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("DEBUG:");
+
+            foreach (Token t in m_tokens)
+            {
+                Console.WriteLine(t.ToString());
+            }
+
+            Console.ForegroundColor = originalColor;
+        }
+
+        public int debugTokenCount()
+        {
+            return m_tokens.Count;
+        } 
+
         private char getChar()
         {
             if (m_srcPtr <= m_source.Length - 1)
@@ -138,9 +165,7 @@ namespace MiniCompiler
             }
             else
             {
-                return '$';
-                // $ is the EOI indicator
-                // unless we are in a string in which case it will be part of the string literal
+                return '\0';
             }
         }
 
@@ -152,7 +177,7 @@ namespace MiniCompiler
             }
             else
             {
-                return '$';
+                return '\0';
             }
         }
 
@@ -172,6 +197,11 @@ namespace MiniCompiler
             return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
         }
 
+        private bool isDigit(char c)
+        {
+            return (c >= '0') && (c <= '9');
+        }
+
         private void registerCharToken(string text, TokenType type)
         {
             Token t = new Token(text, m_srcPtr + 1, m_srcPtr + 1, m_line + 1, type);
@@ -180,128 +210,327 @@ namespace MiniCompiler
 
         public void lex()
         {
-            skipWhiteSpace();
-            char c = getChar();
-
-            if (c == '\n')
+            while (true)
             {
-                m_line++;
-            }
-            else if (isAlphaNumeric(c))
-            {
-                // possible identifier or a keyword
-                int tokenStart = m_srcPtr + 1;
-                string tokenText = "";
-                while (isAlphaNumeric(c))
+                skipWhiteSpace();
+                char c = getChar();
+                
+                if (c == '\0')
                 {
-                    tokenText += c;
+                    Token t = new Token("$", -1, -1, -1, TokenType.EOF);
+                    m_tokens.Add(t);
+                    break;
+                }
+
+                if (c == '\n')
+                {
+                    m_line++;
+                    m_srcPtr++;
+                    continue;
+                }
+                else if (isAlphaNumeric(c))
+                {
+                    // possible identifier or a keyword
+                    int tokenStart = m_srcPtr + 1;
+                    string tokenText = "";
+                    while (isAlphaNumeric(c))
+                    {
+                        tokenText += c;
+                        m_srcPtr++;
+                        c = getChar();
+                    }
+                    int tokenEnd = m_srcPtr;
+                    tokenText = tokenText.Trim();
+                    if (isKeyWord(tokenText))
+                    {
+                        Token t = new Token(
+                            tokenText,
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.KEYWORD
+                        );
+                        m_tokens.Add(t);
+                    }
+                    else
+                    {
+                        Token t = new Token(
+                            tokenText,
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.IDENTIFIER
+                        );
+                        m_tokens.Add(t);
+                    }
+                }
+                else if (isDigit(c))
+                {
+                    string number = "";
+                    int tokenStart = m_srcPtr + 1;
+                    while (isDigit(c)) 
+                    {
+                        number += c;
+                        m_srcPtr++;
+                        c = getChar();
+                    }
+                    int tokenEnd = m_srcPtr;
+                    Token t = new Token(number, tokenStart, tokenEnd, m_line + 1, TokenType.NUMBER);
+                    m_tokens.Add(t);
+                }
+                else if (c == '"')
+                {
+                    // string literal
+                    string stringLit = "";
+                    m_inString = true;
+                    int tokenStart = m_srcPtr + 1;
                     m_srcPtr++;
                     c = getChar();
-                }
-                int tokenEnd = m_srcPtr + 1;
-                tokenText = tokenText.Trim();
-                if (isKeyWord(tokenText))
-                {
-                    Token t = new Token(
-                        tokenText,
-                        tokenStart,
-                        tokenEnd,
-                        m_line + 1,
-                        TokenType.KEYWORD
-                    );
-                    m_tokens.Add(t);
-                }
-                else
-                {
-                    Token t = new Token(
-                        tokenText,
-                        tokenStart,
-                        tokenEnd,
-                        m_line + 1,
-                        TokenType.IDENTIFIER
-                    );
-                    m_tokens.Add(t);
-                }
-            }
-            else if (c == '/')
-            {
-                // this can be DIV or single line comment
-                char peek = peekChar();
-                if (peek == '/')
-                {
-                    // single line comment, ignore text until next '\n'
-                    while (peek != '\n')
+                    while (c != '"')
                     {
+                        stringLit += c;
                         m_srcPtr++;
-                        peek = getChar();
+                        c = getChar();
+                        if (c == '\n')
+                        {
+                            int line = m_line + 1;
+                            string errorMsg =
+                                "In file: "
+                                + m_fileName
+                                + ".min string literal started at ("
+                                + line.ToString()
+                                + ":"
+                                + tokenStart.ToString()
+                                + ") but did't finish";
+                            ErrorHandler.Error(errorMsg);
+                        }
+                    }
+                    m_inString = false;
+                    int tokenEnd = m_srcPtr + 1;
+                    Token t = new Token(
+                        stringLit,
+                        tokenStart,
+                        tokenEnd,
+                        m_line + 1,
+                        TokenType.STRING_LIT
+                    );
+                    m_srcPtr++;
+                }
+                else if (c == '/')
+                {
+                    // this can be DIV or single line comment
+                    char peek = peekChar();
+                    if (peek == '/')
+                    {
+                        // single line comment, ignore text until next '\n'
+                        while (peek != '\n')
+                        {
+                            m_srcPtr++;
+                            peek = getChar();
+                        }
+                    }
+                    else
+                    {
+                        registerCharToken("/", TokenType.DIV);
+                        m_srcPtr++;
+                    }
+                }
+                else if (c == '+')
+                {
+                    registerCharToken("+", TokenType.ADD);
+                    m_srcPtr++;
+                }
+                else if (c == '*')
+                {
+                    registerCharToken("*", TokenType.MUL);
+                    m_srcPtr++;
+                }
+                else if (c == '-')
+                {
+                    registerCharToken("-", TokenType.SUB);
+                    m_srcPtr++;
+                }
+                else if (c == '(')
+                {
+                    registerCharToken("(", TokenType.LEFT_PAREN);
+                    m_srcPtr++;
+                }
+                else if (c == ')')
+                {
+                    registerCharToken(")", TokenType.RIGHT_PAREN);
+                    m_srcPtr++;
+                }
+                else if (c == '{')
+                {
+                    registerCharToken("{", TokenType.LEFT_BRACE);
+                    m_srcPtr++;
+                }
+                else if (c == '}')
+                {
+                    registerCharToken("}", TokenType.RIGHT_BRACE);
+                    m_srcPtr++;
+                }
+                else if (c == ';')
+                {
+                    registerCharToken(";", TokenType.SEMICOLON);
+                    m_srcPtr++;
+                }
+                else if (c == ',')
+                {
+                    registerCharToken(",", TokenType.COLON);
+                    m_srcPtr++;
+                }
+                else if (c == '>')
+                {
+                    char peek = peekChar();
+                    if (peek == '=')
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int tokenEnd = m_srcPtr + 2;
+                        Token t = new Token(
+                            ">=",
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.GREATER_EQUAL
+                        );
+                        m_tokens.Add(t);
+                        m_srcPtr += 2;
+                    }
+                    else
+                    {
+                        registerCharToken(">", TokenType.GREATER_THAN);
+                        m_srcPtr++;
+                    }
+                }
+                else if (c == '<')
+                {
+                    char peek = peekChar();
+                    if (peek == '=')
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int tokenEnd = m_srcPtr + 2;
+                        Token t = new Token(
+                            "<=",
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.LESS_EQUAL
+                        );
+                        m_tokens.Add(t);
+                        m_srcPtr += 2;
+                    }
+                    else
+                    {
+                        registerCharToken("<", TokenType.LESS_THAN);
+                        m_srcPtr++;
+                    }
+                }
+                else if (c == '=')
+                {
+                    char peek = peekChar();
+                    if (peek == '=')
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int tokenEnd = m_srcPtr + 2;
+                        Token t = new Token(
+                            "==",
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.EQUAL_EQUAL
+                        );
+                        m_tokens.Add(t);
+                        m_srcPtr += 2;
+                    }
+                    else
+                    {
+                        registerCharToken("=", TokenType.EQUAL);
+                        m_srcPtr++;
+                    }
+                }
+                else if (c == '&')
+                {
+                    char peek = peekChar();
+                    if (peek == '&')
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int tokenEnd = m_srcPtr + 2;
+                        Token t = new Token(
+                            "&&",
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.LOGICAL_AND
+                        );
+                        m_tokens.Add(t);
+                        m_srcPtr += 2;
+                    }
+                    else
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int line = m_line + 1;
+                        string errorMsg =
+                            "Invalid token: '&' in "
+                            + m_fileName
+                            + ".min ("
+                            + line.ToString()
+                            + ":"
+                            + tokenStart.ToString()
+                            + ")";
+                        ErrorHandler.Error(errorMsg);
+                    }
+                }
+                else if (c == '|')
+                {
+                    char peek = peekChar();
+                    if (peek == '|')
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int tokenEnd = m_srcPtr + 2;
+                        Token t = new Token(
+                            "||",
+                            tokenStart,
+                            tokenEnd,
+                            m_line + 1,
+                            TokenType.LOGICAL_OR
+                        );
+                        m_tokens.Add(t);
+                        m_srcPtr += 2;
+                    }
+                    else
+                    {
+                        int tokenStart = m_srcPtr + 1;
+                        int line = m_line + 1;
+                        string errorMsg =
+                            "Invalid token: '|' in "
+                            + m_fileName
+                            + ".min ("
+                            + line.ToString()
+                            + ":"
+                            + tokenStart.ToString()
+                            + ")";
+                        ErrorHandler.Error(errorMsg);
                     }
                 }
                 else
                 {
-                    registerCharToken("/", TokenType.DIV);
-                    m_srcPtr++;
-                }
-            }
-            else if (c == '+')
-            {
-                registerCharToken("+", TokenType.ADD);
-                m_srcPtr++;
-            }
-            else if (c == '*')
-            {
-                registerCharToken("*", TokenType.MUL);
-                m_srcPtr++;
-            }
-            else if (c == '-')
-            {
-                registerCharToken("-", TokenType.SUB);
-                m_srcPtr++;
-            }
-            else if (c == '(')
-            {
-                registerCharToken("(", TokenType.LEFT_PAREN);
-                m_srcPtr++;
-            }
-            else if (c == ')')
-            {
-                registerCharToken(")", TokenType.RIGHT_PAREN);
-                m_srcPtr++;
-            }
-            else if (c == '{')
-            {
-                registerCharToken("{", TokenType.LEFT_BRACE);
-                m_srcPtr++;
-            }
-            else if (c == '}')
-            {
-                registerCharToken("}", TokenType.RIGHT_BRACE);
-                m_srcPtr++;
-            }
-            else if (c == ';')
-            {
-                registerCharToken(";", TokenType.SEMICOLON);
-                m_srcPtr++;
-            }
-            else if (c == ',')
-            {
-                registerCharToken(",", TokenType.COLON);
-                m_srcPtr++;
-            }
-            else if (c == '>')
-            {
-                char peek = peekChar();
-                if (peek == '=')
-                {
                     int tokenStart = m_srcPtr + 1;
-                    int tokenEnd = m_srcPtr + 2;
-                    Token t = new Token(">=", tokenStart, tokenEnd, m_line + 1, TokenType.GREATER_EQUAL);
-                    m_srcPtr += 2;
+                    int line = m_line + 1;
+                    string errorMsg =
+                        "Invalid character: '"
+                        + c
+                        + "' in "
+                        + m_fileName
+                        + ".min ("
+                        + line.ToString()
+                        + ":"
+                        + tokenStart.ToString()
+                        + ")";
+                    ErrorHandler.Error(errorMsg);
                 }
-                else
-                {
-                    registerCharToken(">", TokenType.GREATER_THAN);
-                    m_srcPtr++;
-                }
+                
+
             }
         }
     }
