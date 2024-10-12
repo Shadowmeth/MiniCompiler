@@ -37,8 +37,6 @@ Statement ::=
     | FunctionCall 
     | Block 
     | ReturnStatement 
-    | ReturnStatement
-    | ReturnStatement
     | ';'
 
 Assignment ::= Identifier '=' Expression ';'
@@ -50,19 +48,19 @@ WhileStatement ::= 'while' '(' Expression ')' Statement
 FunctionCall ::= Identifier '(' ArgumentList ')'
 
 ArgumentList ::=
-ReturnStatement ::= 'return' Expression ';'
-
     | Expression
-ReturnStatement ::= 'return' Expression ';'
-
-ReturnStatement ::= 'return' Expression ';'
-
-ReturnStatement ::= 'return' Expression ';'
-
     | Expression ',' ArgumentList
+
 ReturnStatement ::= 'return' Expression ';'
 
+Expression ::=
+    | LogicalExpression 
+    | '(' Expression ')'
 
+LogicalExpression ::=
+    | RelationalExpression 
+    | LogicalExpression '&&' RelationalExpression 
+    | LogicalExpression '||' RelationalExpression
 
 RelationalExpression ::= 
     | ArithmeticExpression
@@ -75,16 +73,6 @@ RelOp ::=
     | '>'
     | '<='
     | '>='
-ReturnStatement ::= 'return' Expression ';'
-
-Expression ::=
-    | LogicalExpression 
-    | '(' Expression ')'
-
-LogicalExpression ::=
-    | RelationalExpression 
-    | LogicalExpression '&&' RelationalExpression 
-    | LogicalExpression '||' RelationalExpression
 
 ArithmeticExpression ::= Term ((ADD | SUB) Term)*
 

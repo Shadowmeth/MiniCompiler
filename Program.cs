@@ -40,7 +40,7 @@
             extractFileName();
 
             Lexer lexer = new Lexer(m_fileName, true);
-            lexer.lex();
+            // lexer.lex();
             lexer.debugPrintSource();
         }
     }
