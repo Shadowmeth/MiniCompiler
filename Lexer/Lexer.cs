@@ -1,13 +1,22 @@
 namespace MiniCompiler
 {
+    public enum TokenType { }
+
+    public class Token
+    {
+        public string? text { get; set; }
+        public int startPosition { get; set; }
+        public int endPosition { get; set; }
+        public TokenType tokenType;
+    }
+
     public class Lexer
     {
         private bool m_writeToFile;
         private String m_fileName = "";
         private String m_source = "";
-        private int m_start = -1;
-        private int m_end = -1;
-        private List<String>? m_tokens = null;
+        private int m_srcPtr = -1;
+        private List<Token>? m_tokens = null;
 
         public Lexer()
         {
@@ -19,7 +28,9 @@ namespace MiniCompiler
         {
             m_fileName = fileName;
             m_writeToFile = writeToFile;
-            m_tokens = new List<String>();
+            m_tokens = new List<Token>();
+            m_srcPtr = 1;
+            readSourceFile();
         }
 
         private void readSourceFile()
@@ -43,9 +54,8 @@ namespace MiniCompiler
             }
         }
 
-        public void lex()
-        {
-            readSourceFile();
-        }
+        private char getChar() { }
+
+        public void lex() { }
     }
 }

@@ -1,0 +1,92 @@
+Program ::= DeclarationList
+
+DeclarationList ::=
+    | Declaration DeclarationList
+    | FunctionDefinition DeclarationList
+    | ε
+
+Declaration ::= Type IdentifierList ';'
+
+IdentifierList ::=
+    | Identifier
+    | Identifier ',' IdentifierList
+
+Type ::=
+    | 'int'
+    | 'bool'
+    | 'string'
+    | 'struct' Identifier
+
+FunctionDefinition ::= Type Identifier '(' ParameterList ')' Block
+
+ParameterList ::=
+    | Type Identifier
+    | Type Identifier ',' ParameterList
+
+Block ::= '{' StatementList '}'
+
+StatementList ::=
+    | Statement
+    | Statement StatementList
+    | ε
+
+Statement ::=
+    | Assignment 
+    | IfStatement 
+    | WhileStatement 
+    | FunctionCall 
+    | Block 
+    | ';'
+
+Assignment ::= Identifier '=' Expression ';'
+
+IfStatement ::= 'if' '(' Expression ')' Statement ('else' Statement)?
+
+WhileStatement ::= 'while' '(' Expression ')' Statement
+
+FunctionCall ::= Identifier '(' ArgumentList ')'
+
+ArgumentList ::=
+    | Expression
+    | Expression ',' ArgumentList
+
+Expression ::=
+    | LogicalExpression 
+    | '(' Expression ')'
+
+LogicalExpression ::=
+    | ArithmeticExpression 
+    | LogicalExpression '&&' ArithmeticExpression 
+    | LogicalExpression '||' ArithmeticExpression
+
+ArithmeticExpression ::= Term ((ADD | SUB) Term)*
+
+Term ::= Factor ((MUL | DIV) Factor)*
+
+Factor ::=
+    | Identifier 
+    | Number 
+    | StringLiteral 
+    | BoolLiteral 
+    | '(' Expression ')'
+
+ADD ::= '+'
+SUB ::= '-'
+MUL ::= '*'
+DIV ::= '/'
+
+StringLiteral ::= '"' [^"]* '"'
+
+BoolLiteral ::= 'true' | 'false'
+
+StructureDefinition ::= 'struct' Identifier '{' FieldDefinitionList '}'
+
+FieldDefinitionList ::=
+    | FieldDefinition
+    | FieldDefinition FieldDefinitionList
+
+FieldDefinition ::= Type Identifier ';'
+
+Identifier ::= [a-zA-Z_][a-zA-Z_0-9]*
+
+Number ::= [0-9]+
