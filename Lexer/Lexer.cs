@@ -52,9 +52,8 @@ namespace MiniCompiler
 
         public override string ToString()
         {
-            return $"at line: {line}, span: {startPosition}:{endPosition}, token text: \"{text}\"";
+            return $"{line} {startPosition}:{endPosition} \"{text}\"";
         }
-
     }
 
     // NOTE: A lot of indexes start at 0. Need to save them as +1
@@ -69,6 +68,7 @@ namespace MiniCompiler
         private List<Token>? m_tokens = null;
         private bool m_inString = false;
         private int m_line = 0;
+        private int m_coloumn = 0;
 
         public Lexer()
         {
@@ -155,7 +155,7 @@ namespace MiniCompiler
         public int debugTokenCount()
         {
             return m_tokens.Count;
-        } 
+        }
 
         private char getChar()
         {
@@ -188,6 +188,7 @@ namespace MiniCompiler
             while ((c == ' ' || c == '\t' || c == '\r') && !m_inString)
             {
                 m_srcPtr++;
+                m_coloumn++;
                 c = getChar();
             }
         }
@@ -204,9 +205,11 @@ namespace MiniCompiler
 
         private void registerCharToken(string text, TokenType type)
         {
-            Token t = new Token(text, m_srcPtr + 1, m_srcPtr + 1, m_line + 1, type);
+            Token t = new Token(text, m_coloumn + 1, m_coloumn + 1, m_line + 1, type);
             m_tokens.Add(t);
         }
+
+        private void writeToFile() { }
 
         public void lex()
         {
@@ -214,10 +217,10 @@ namespace MiniCompiler
             {
                 skipWhiteSpace();
                 char c = getChar();
-                
+
                 if (c == '\0')
                 {
-                    Token t = new Token("$", -1, -1, -1, TokenType.EOF);
+                    Token t = new Token("EOF", -1, -1, -1, TokenType.EOF);
                     m_tokens.Add(t);
                     break;
                 }
@@ -226,20 +229,22 @@ namespace MiniCompiler
                 {
                     m_line++;
                     m_srcPtr++;
+                    m_coloumn = 0;
                     continue;
                 }
                 else if (isAlphaNumeric(c))
                 {
                     // possible identifier or a keyword
-                    int tokenStart = m_srcPtr + 1;
+                    int tokenStart = m_coloumn + 1;
                     string tokenText = "";
                     while (isAlphaNumeric(c))
                     {
                         tokenText += c;
                         m_srcPtr++;
+                        m_coloumn++;
                         c = getChar();
                     }
-                    int tokenEnd = m_srcPtr;
+                    int tokenEnd = m_coloumn;
                     tokenText = tokenText.Trim();
                     if (isKeyWord(tokenText))
                     {
@@ -267,14 +272,15 @@ namespace MiniCompiler
                 else if (isDigit(c))
                 {
                     string number = "";
-                    int tokenStart = m_srcPtr + 1;
-                    while (isDigit(c)) 
+                    int tokenStart = m_coloumn + 1;
+                    while (isDigit(c))
                     {
                         number += c;
                         m_srcPtr++;
+                        m_coloumn++;
                         c = getChar();
                     }
-                    int tokenEnd = m_srcPtr;
+                    int tokenEnd = m_coloumn;
                     Token t = new Token(number, tokenStart, tokenEnd, m_line + 1, TokenType.NUMBER);
                     m_tokens.Add(t);
                 }
@@ -283,30 +289,32 @@ namespace MiniCompiler
                     // string literal
                     string stringLit = "";
                     m_inString = true;
-                    int tokenStart = m_srcPtr + 1;
+                    int tokenStart = m_coloumn + 1;
                     m_srcPtr++;
                     c = getChar();
                     while (c != '"')
                     {
                         stringLit += c;
                         m_srcPtr++;
+                        m_coloumn++;
                         c = getChar();
                         if (c == '\n')
                         {
                             int line = m_line + 1;
+                            int coloumn = m_coloumn + 1;
                             string errorMsg =
                                 "In file: "
                                 + m_fileName
                                 + ".min string literal started at ("
                                 + line.ToString()
                                 + ":"
-                                + tokenStart.ToString()
+                                + coloumn.ToString()
                                 + ") but did't finish";
                             ErrorHandler.Error(errorMsg);
                         }
                     }
                     m_inString = false;
-                    int tokenEnd = m_srcPtr + 1;
+                    int tokenEnd = m_coloumn + 1;
                     Token t = new Token(
                         stringLit,
                         tokenStart,
@@ -315,6 +323,7 @@ namespace MiniCompiler
                         TokenType.STRING_LIT
                     );
                     m_srcPtr++;
+                    m_coloumn++;
                 }
                 else if (c == '/')
                 {
@@ -332,52 +341,62 @@ namespace MiniCompiler
                     else
                     {
                         registerCharToken("/", TokenType.DIV);
+                        m_coloumn++;
                         m_srcPtr++;
                     }
                 }
                 else if (c == '+')
                 {
                     registerCharToken("+", TokenType.ADD);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '*')
                 {
                     registerCharToken("*", TokenType.MUL);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '-')
                 {
                     registerCharToken("-", TokenType.SUB);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '(')
                 {
                     registerCharToken("(", TokenType.LEFT_PAREN);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == ')')
                 {
                     registerCharToken(")", TokenType.RIGHT_PAREN);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '{')
                 {
                     registerCharToken("{", TokenType.LEFT_BRACE);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '}')
                 {
                     registerCharToken("}", TokenType.RIGHT_BRACE);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == ';')
                 {
                     registerCharToken(";", TokenType.SEMICOLON);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == ',')
                 {
                     registerCharToken(",", TokenType.COLON);
+                    m_coloumn++;
                     m_srcPtr++;
                 }
                 else if (c == '>')
@@ -385,8 +404,8 @@ namespace MiniCompiler
                     char peek = peekChar();
                     if (peek == '=')
                     {
-                        int tokenStart = m_srcPtr + 1;
-                        int tokenEnd = m_srcPtr + 2;
+                        int tokenStart = m_coloumn + 1;
+                        int tokenEnd = m_coloumn + 2;
                         Token t = new Token(
                             ">=",
                             tokenStart,
@@ -395,11 +414,13 @@ namespace MiniCompiler
                             TokenType.GREATER_EQUAL
                         );
                         m_tokens.Add(t);
+                        m_coloumn += 2;
                         m_srcPtr += 2;
                     }
                     else
                     {
                         registerCharToken(">", TokenType.GREATER_THAN);
+                        m_coloumn++;
                         m_srcPtr++;
                     }
                 }
@@ -408,8 +429,8 @@ namespace MiniCompiler
                     char peek = peekChar();
                     if (peek == '=')
                     {
-                        int tokenStart = m_srcPtr + 1;
-                        int tokenEnd = m_srcPtr + 2;
+                        int tokenStart = m_coloumn + 1;
+                        int tokenEnd = m_coloumn + 2;
                         Token t = new Token(
                             "<=",
                             tokenStart,
@@ -418,11 +439,13 @@ namespace MiniCompiler
                             TokenType.LESS_EQUAL
                         );
                         m_tokens.Add(t);
+                        m_coloumn += 2;
                         m_srcPtr += 2;
                     }
                     else
                     {
                         registerCharToken("<", TokenType.LESS_THAN);
+                        m_coloumn++;
                         m_srcPtr++;
                     }
                 }
@@ -431,8 +454,8 @@ namespace MiniCompiler
                     char peek = peekChar();
                     if (peek == '=')
                     {
-                        int tokenStart = m_srcPtr + 1;
-                        int tokenEnd = m_srcPtr + 2;
+                        int tokenStart = m_coloumn + 1;
+                        int tokenEnd = m_coloumn + 2;
                         Token t = new Token(
                             "==",
                             tokenStart,
@@ -441,11 +464,13 @@ namespace MiniCompiler
                             TokenType.EQUAL_EQUAL
                         );
                         m_tokens.Add(t);
+                        m_coloumn += 2;
                         m_srcPtr += 2;
                     }
                     else
                     {
                         registerCharToken("=", TokenType.EQUAL);
+                        m_coloumn++;
                         m_srcPtr++;
                     }
                 }
@@ -454,8 +479,8 @@ namespace MiniCompiler
                     char peek = peekChar();
                     if (peek == '&')
                     {
-                        int tokenStart = m_srcPtr + 1;
-                        int tokenEnd = m_srcPtr + 2;
+                        int tokenStart = m_coloumn + 1;
+                        int tokenEnd = m_coloumn + 2;
                         Token t = new Token(
                             "&&",
                             tokenStart,
@@ -464,11 +489,12 @@ namespace MiniCompiler
                             TokenType.LOGICAL_AND
                         );
                         m_tokens.Add(t);
+                        m_coloumn += 2;
                         m_srcPtr += 2;
                     }
                     else
                     {
-                        int tokenStart = m_srcPtr + 1;
+                        int tokenStart = m_coloumn + 1;
                         int line = m_line + 1;
                         string errorMsg =
                             "Invalid token: '&' in "
@@ -486,8 +512,8 @@ namespace MiniCompiler
                     char peek = peekChar();
                     if (peek == '|')
                     {
-                        int tokenStart = m_srcPtr + 1;
-                        int tokenEnd = m_srcPtr + 2;
+                        int tokenStart = m_coloumn + 1;
+                        int tokenEnd = m_coloumn + 2;
                         Token t = new Token(
                             "||",
                             tokenStart,
@@ -496,11 +522,12 @@ namespace MiniCompiler
                             TokenType.LOGICAL_OR
                         );
                         m_tokens.Add(t);
+                        m_coloumn += 2;
                         m_srcPtr += 2;
                     }
                     else
                     {
-                        int tokenStart = m_srcPtr + 1;
+                        int tokenStart = m_coloumn + 1;
                         int line = m_line + 1;
                         string errorMsg =
                             "Invalid token: '|' in "
@@ -515,7 +542,7 @@ namespace MiniCompiler
                 }
                 else
                 {
-                    int tokenStart = m_srcPtr + 1;
+                    int tokenStart = m_coloumn + 1;
                     int line = m_line + 1;
                     string errorMsg =
                         "Invalid character: '"
@@ -529,8 +556,6 @@ namespace MiniCompiler
                         + ")";
                     ErrorHandler.Error(errorMsg);
                 }
-                
-
             }
         }
     }
