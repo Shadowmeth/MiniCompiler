@@ -289,7 +289,7 @@ namespace MiniCompiler
                     // string literal
                     string stringLit = "";
                     m_inString = true;
-                    int tokenStart = m_coloumn + 1;
+                    int tokenStart = m_coloumn + 2;
                     m_srcPtr++;
                     c = getChar();
                     while (c != '"')
@@ -322,8 +322,9 @@ namespace MiniCompiler
                         m_line + 1,
                         TokenType.STRING_LIT
                     );
+                    m_tokens.Add(t);
                     m_srcPtr++;
-                    m_coloumn++;
+                    m_coloumn += 2;
                 }
                 else if (c == '/')
                 {
