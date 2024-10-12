@@ -23,7 +23,7 @@
 
         private static void extractFileName()
         {
-            // -4 because ".min" is 4 chars
+            // ".min" is 4 chars
             m_fileName = m_fileName.Remove(m_fileName.Length - 4);
         }
 
