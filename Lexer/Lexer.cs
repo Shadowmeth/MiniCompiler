@@ -52,7 +52,7 @@ namespace MiniCompiler
 
         public override string ToString()
         {
-            return $"{line} {startPosition}:{endPosition} \"{text}\"";
+            return $"{line} {startPosition}:{endPosition} {tokenType.ToString()} {text}";
         }
     }
 
@@ -209,7 +209,20 @@ namespace MiniCompiler
             m_tokens.Add(t);
         }
 
-        private void writeToFile() { }
+        private void writeToFile()
+        {
+            string fileName = m_fileName + ".lex";
+            using (FileStream fileStream = new FileStream(fileName, FileMode.Create))
+            {
+                using (StreamWriter writer = new StreamWriter(fileStream))
+                {
+                    foreach (Token t in m_tokens)
+                    {
+                        writer.WriteLine(t.ToString());
+                    }
+                }
+            }
+        }
 
         public void lex()
         {
@@ -557,6 +570,11 @@ namespace MiniCompiler
                         + ")";
                     ErrorHandler.Error(errorMsg);
                 }
+            }
+
+            if (m_writeToFile)
+            {
+                writeToFile();
             }
         }
     }
